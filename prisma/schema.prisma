@@ -1,0 +1,421 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  SALES
+  FINANCE
+  SUPPORT
+  CUSTOMER
+}
+
+enum ProductType {
+  PHYSICAL
+  DIGITAL
+  SERVICE
+}
+
+enum BillingInterval {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum QuoteStatus {
+  DRAFT
+  QUOTATION
+  CONFIRMED
+  ACTIVE
+  CLOSED
+}
+
+enum SubscriptionStatus {
+  DRAFT
+  CONFIRMED
+  ACTIVE
+  PAUSED
+  CLOSED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  CONFIRMED
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CARD
+  BANK_TRANSFER
+  CASH
+  CHECK
+  DIRECT_DEBIT
+  STRIPE
+  PAYPAL
+  MANUAL
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum DiscountType {
+  FIXED
+  PERCENTAGE
+}
+
+enum DiscountScope {
+  PRODUCT
+  SUBSCRIPTION
+  BOTH
+}
+
+model User {
+  id               String               @id @default(cuid())
+  email            String               @unique
+  passwordHash     String
+  role             Role                 @default(CUSTOMER)
+  customer         Customer?
+  sessions         Session[]
+  resetTokens      PasswordResetToken[]
+  quotesCreated    Quote[]              @relation("QuoteCreatedBy")
+  paymentsRecorded Payment[]            @relation("PaymentRecordedBy")
+  auditLogs        AuditLog[]
+  createdAt        DateTime             @default(now())
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+}
+
+model Customer {
+  id                  String               @id @default(cuid())
+  userId              String?              @unique
+  user                User?                @relation(fields: [userId], references: [id])
+  name                String
+  email               String               @unique
+  billingAddress      String?
+  taxInfo             String?
+  notes               String?
+  subscriptions       Subscription[]
+  quotes              Quote[]
+  invoices            Invoice[]
+  discountRedemptions DiscountRedemption[]
+  createdAt           DateTime             @default(now())
+}
+
+model Product {
+  id                String              @id @default(cuid())
+  name              String
+  type              ProductType
+  salesPrice        Int
+  costPrice         Int
+  notes             String?
+  availableFrom     DateTime?
+  availableUntil    DateTime?
+  active            Boolean             @default(true)
+  options           ProductOption[]
+  planLines         PlanLine[]
+  quoteLines        QuoteLine[]
+  subscriptionLines SubscriptionLine[]
+  invoiceLines      InvoiceLine[]
+  templateLines     QuoteTemplateLine[]
+  createdAt         DateTime            @default(now())
+}
+
+model ProductOption {
+  id        String               @id @default(cuid())
+  productId String
+  product   Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  values    ProductOptionValue[]
+}
+
+model ProductOptionValue {
+  id         String        @id @default(cuid())
+  optionId   String
+  option     ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  value      String
+  priceDelta Int           @default(0)
+  costDelta  Int           @default(0)
+}
+
+model Plan {
+  id                   String          @id @default(cuid())
+  name                 String
+  description          String?
+  billingInterval      BillingInterval
+  billingIntervalCount Int             @default(1)
+  minimumQuantity      Int             @default(1)
+  currency             String          @default("USD")
+  availableFrom        DateTime?
+  availableUntil       DateTime?
+  autoCloseOnEnd       Boolean         @default(false)
+  allowPause           Boolean         @default(true)
+  allowEarlyClose      Boolean         @default(true)
+  allowRenewal         Boolean         @default(true)
+  active               Boolean         @default(true)
+  lines                PlanLine[]
+  subscriptions        Subscription[]
+  quotes               Quote[]
+  createdAt            DateTime        @default(now())
+}
+
+model PlanLine {
+  id                String  @id @default(cuid())
+  planId            String
+  plan              Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  productId         String
+  product           Product @relation(fields: [productId], references: [id])
+  quantity          Int
+  unitPriceOverride Int?
+  optionSelection   Json?
+}
+
+model QuoteTemplate {
+  id           String              @id @default(cuid())
+  name         String
+  validityDays Int                 @default(30)
+  paymentTerms String              @default("net-30")
+  active       Boolean             @default(true)
+  quotes       Quote[]
+  lines        QuoteTemplateLine[]
+}
+
+model QuoteTemplateLine {
+  id         String        @id @default(cuid())
+  templateId String
+  template   QuoteTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product       @relation(fields: [productId], references: [id])
+  quantity   Int
+  unitPrice  Int?
+}
+
+model Quote {
+  id            String         @id @default(cuid())
+  number        String         @unique
+  customerId    String
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  templateId    String?
+  template      QuoteTemplate? @relation(fields: [templateId], references: [id])
+  planId        String?
+  plan          Plan?          @relation(fields: [planId], references: [id])
+  status        QuoteStatus    @default(DRAFT)
+  validUntil    DateTime
+  paymentTerms  String         @default("net-30")
+  currency      String         @default("USD")
+  total         Int            @default(0)
+  createdById   String?
+  createdBy     User?          @relation("QuoteCreatedBy", fields: [createdById], references: [id])
+  lines         QuoteLine[]
+  subscriptions Subscription[]
+  createdAt     DateTime       @default(now())
+}
+
+model QuoteLine {
+  id              String   @id @default(cuid())
+  quoteId         String
+  quote           Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  quantity        Int
+  unitPrice       Int
+  optionSelection Json?
+  taxRuleId       String?
+  taxRule         TaxRule? @relation(fields: [taxRuleId], references: [id])
+  amount          Int      @default(0)
+}
+
+model Subscription {
+  id            String             @id @default(cuid())
+  number        String             @unique
+  customerId    String
+  customer      Customer           @relation(fields: [customerId], references: [id])
+  planId        String
+  plan          Plan               @relation(fields: [planId], references: [id])
+  quoteId       String?
+  quote         Quote?             @relation(fields: [quoteId], references: [id])
+  status        SubscriptionStatus @default(DRAFT)
+  startDate     DateTime           @default(now())
+  expiryDate    DateTime?
+  paymentTerms  String             @default("net-30")
+  currency      String             @default("USD")
+  nextBillingAt DateTime?
+  pausedAt      DateTime?
+  closedAt      DateTime?
+  closeReason   String?
+  lines         SubscriptionLine[]
+  invoices      Invoice[]
+}
+
+model SubscriptionLine {
+  id              String       @id @default(cuid())
+  subscriptionId  String
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product      @relation(fields: [productId], references: [id])
+  quantity        Int
+  unitPrice       Int
+  optionSelection Json?
+  taxRuleId       String?
+  taxRule         TaxRule?     @relation(fields: [taxRuleId], references: [id])
+}
+
+model Invoice {
+  id             String               @id @default(cuid())
+  number         String               @unique
+  subscriptionId String?
+  subscription   Subscription?        @relation(fields: [subscriptionId], references: [id])
+  customerId     String
+  customer       Customer             @relation(fields: [customerId], references: [id])
+  status         InvoiceStatus        @default(DRAFT)
+  issueDate      DateTime             @default(now())
+  dueDate        DateTime
+  periodStart    DateTime?
+  periodEnd      DateTime?
+  currency       String               @default("USD")
+  subtotal       Int                  @default(0)
+  discountTotal  Int                  @default(0)
+  taxTotal       Int                  @default(0)
+  total          Int                  @default(0)
+  paidTotal      Int                  @default(0)
+  balance        Int                  @default(0)
+  discountRuleId String?
+  discountRule   DiscountRule?        @relation(fields: [discountRuleId], references: [id])
+  notes          String?
+  lines          InvoiceLine[]
+  allocations    PaymentAllocation[]
+  redemptions    DiscountRedemption[]
+
+  @@unique([subscriptionId, periodStart, periodEnd])
+}
+
+model InvoiceLine {
+  id              String   @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  description     String
+  quantity        Int
+  unitPrice       Int
+  taxAmount       Int      @default(0)
+  discountAmount  Int      @default(0)
+  total           Int      @default(0)
+  optionSelection Json?
+  taxRuleId       String?
+  taxRule         TaxRule? @relation(fields: [taxRuleId], references: [id])
+}
+
+model TaxRule {
+  id                String             @id @default(cuid())
+  name              String
+  rateBps           Int
+  productScope      String?
+  regionScope       String?
+  priority          Int                @default(0)
+  active            Boolean            @default(true)
+  validFrom         DateTime?
+  validTo           DateTime?
+  inclusive         Boolean            @default(false)
+  quoteLines        QuoteLine[]
+  subscriptionLines SubscriptionLine[]
+  invoiceLines      InvoiceLine[]
+}
+
+model DiscountRule {
+  id              String               @id @default(cuid())
+  name            String
+  type            DiscountType
+  value           Int
+  minimumPurchase Int?
+  minimumQuantity Int?
+  startsAt        DateTime?
+  endsAt          DateTime?
+  usageLimit      Int?
+  usageCount      Int                  @default(0)
+  scope           DiscountScope        @default(SUBSCRIPTION)
+  active          Boolean              @default(true)
+  priority        Int                  @default(0)
+  invoices        Invoice[]
+  redemptions     DiscountRedemption[]
+}
+
+model DiscountRedemption {
+  id             String       @id @default(cuid())
+  discountRuleId String
+  discountRule   DiscountRule @relation(fields: [discountRuleId], references: [id])
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId], references: [id])
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id])
+  subscriptionId String?
+  amount         Int
+  redeemedAt     DateTime     @default(now())
+}
+
+model Payment {
+  id                String              @id @default(cuid())
+  method            PaymentMethod
+  amount            Int
+  currency          String              @default("USD")
+  paidAt            DateTime            @default(now())
+  note              String?
+  externalReference String?
+  status            PaymentStatus       @default(COMPLETED)
+  recordedById      String?
+  recordedBy        User?               @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
+  allocations       PaymentAllocation[]
+}
+
+model PaymentAllocation {
+  id        String  @id @default(cuid())
+  paymentId String
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+  amount    Int
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  entityType String
+  entityId   String
+  action     String
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+}
+
+model SequenceCounter {
+  key       String @id
+  lastValue Int    @default(0)
+}
