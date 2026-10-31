@@ -1,2 +1,3 @@
 # Brightloop Software Subcription Management System.
-A subscription management system for the Odoo x Make-A-Ton 9.0 Kochi Hackathon 2026.
+A subscription management system for the Odoo x Make-A-Ton 9.0 Kochi Hackathon 2026. With many features
+
