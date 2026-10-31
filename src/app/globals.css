@@ -1,0 +1,40 @@
+body {
+font-family: Arial, Helvetica, sans-serif;
+margin: 0;
+background: #f7f7f7;
+color: #111;
+}
+a {
+color: #0057ff;
+text-decoration: none;
+}
+.container {
+max-width: 1200px;
+margin: 0 auto;
+padding: 24px;
+}
+.card {
+background: white;
+border: 1px solid #ddd;
+border-radius: 8px;
+padding: 16px;
+margin-bottom: 16px;
+}
+input,
+textarea,
+select,
+button {
+width: 100%;
+padding: 8px;
+margin: 6px 0;
+box-sizing: border-box;
+}
+button {
+width: auto;
+cursor: pointer;
+} pre {
+background: #111;
+color: #fff;
+padding: 12px;
+overflow: auto;
+}
