@@ -1,3 +1,23 @@
-# Brightloop Software Subcription Management System.
-A subscription management system for the Odoo x Make-A-Ton 9.0 Kochi Hackathon 2026. With many features
+# Subscription System
 
+Subscription management platform.
+
+## Stack
+
+- TypeScript
+- Next.js
+- PostgreSQL
+- Prisma
+- Zod
+- Vitest
+- Docker
+
+## Setup
+
+```bash
+cp .env.example .env
+docker compose up -d
+pnpm install
+pnpm prisma migrate dev --name init
+pnpm prisma db seed
+pnpm dev
