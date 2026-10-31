@@ -1,6 +1,6 @@
 # Subscription System
 
-Subscription management platform.
+Subscription management platform for odoo hackathon.
 
 ## Stack
 
